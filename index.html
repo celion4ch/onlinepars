@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LiveBall — Live Матчи</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #0a0e17;
+            --bg-card: #131a2b;
+            --bg-card-hover: #1a2540;
+            --accent: #00d4aa;
+            --accent-glow: rgba(0, 212, 170, 0.2);
+            --accent-dim: #00a885;
+            --text: #e8edf5;
+            --text-secondary: #7a8ba7;
+            --live-red: #ff3b5c;
+            --live-glow: rgba(255, 59, 92, 0.3);
+            --border: rgba(255,255,255,0.06);
+            --score-bg: #0d1220;
+            --bk-1xbet: #1a6cb4;
+            --bk-fonbet: #e44d26;
+            --bk-winline: #ffc107;
+            --bk-betboom: #ff6b35;
+            --bk-leon: #dc3545;
+            --bk-melbet: #8b5cf6;
+            --radius: 14px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* === BG EFFECT === */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(0,212,170,0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(255,59,92,0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 16px 12px 100px;
+        }
+
+        /* === HEADER === */
+        .header {
+            text-align: center;
+            padding: 20px 0 16px;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent), #00f0c0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* === SPORT TABS === */
+        .sport-tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 8px 0 16px;
+            scrollbar-width: none;
+        }
+        .sport-tabs::-webkit-scrollbar { display: none; }
+
+        .sport-tab {
+            flex-shrink: 0;
+            padding: 8px 16px;
+            border-radius: 50px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .sport-tab:hover { background: var(--bg-card-hover); }
+        .sport-tab.active {
+            background: var(--accent);
+            color: #0a0e17;
+            border-color: var(--accent);
+            font-weight: 600;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        /* === MATCH CARDS === */
+        .matches-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .match-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+        .match-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .match-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .match-card:hover::before { opacity: 1; }
+        .match-card.live::before { background: var(--live-red); opacity: 1; }
+
+        .match-league {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .live-badge {
+            background: var(--live-red);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 50px;
+            animation: pulse-live 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-live {
+            0%, 100% { box-shadow: 0 0 0 0 var(--live-glow); }
+            50% { box-shadow: 0 0 0 6px transparent; }
+        }
+
+        .match-teams {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .match-team {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .match-team.away { text-align: right; }
+
+        .match-score {
+            background: var(--score-bg);
+            border-radius: 10px;
+            padding: 6px 14px;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--accent);
+            min-width: 70px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .match-card.live .match-score { color: var(--live-red); }
+
+        .match-time {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        /* === MATCH DETAIL (overlay) === */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .overlay.open { display: flex; }
+
+        .detail-panel {
+            background: var(--bg);
+            width: 100%;
+            max-width: 480px;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            padding: 20px 16px 32px;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .detail-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+
+        .detail-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .detail-league {
+            font-size: 12px;
+            color: var(--accent);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .detail-teams {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 12px;
+        }
+        .detail-team-name {
+            font-size: 18px;
+            font-weight: 700;
+            max-width: 130px;
+            text-align: center;
+        }
+        .detail-score-big {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--accent);
+            letter-spacing: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+        .detail-time {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        /* === BOOKMAKER SECTION === */
+        .bk-section {
+            margin-top: 24px;
+        }
+        .bk-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bk-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .bk-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.2s;
+        }
+        .bk-item:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .bk-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 800;
+            color: white;
+            flex-shrink: 0;
+        }
+        .bk-name {
+            font-size: 14px;
+            font-weight: 600;
+            flex: 1;
+        }
+        .bk-go {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            padding: 4px 12px;
+            border: 1px solid var(--accent);
+            border-radius: 50px;
+        }
+
+        /* === INFO SECTION === */
+        .info-section {
+            margin-top: 24px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        .info-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: var(--text-secondary); }
+        .info-value { font-weight: 600; }
+
+        /* === CLOSE BTN === */
+        .close-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin-top: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .close-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text);
+        }
+
+        /* === LOADING === */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 0;
+            color: var(--text-secondary);
+            gap: 16px;
+        }
+        .spinner {
+            width: 32px; height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty p { font-size: 14px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ LiveBall</h1>
+            <p>Live-матчи и коэффициенты</p>
+        </div>
+
+        <!-- Sport Tabs -->
+        <div class="sport-tabs" id="sportTabs"></div>
+
+        <!-- Matches List -->
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>Загрузка матчей...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Detail Overlay -->
+    <div class="overlay" id="overlay" onclick="closeDetail(event)">
+        <div class="detail-panel" id="detailPanel" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // КОНФИГУРАЦИЯ
+        // ==========================================
+
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            // Применяем тему Telegram
+            document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#0a0e17');
+        }
+
+        // ==========================================
+        // БУКМЕКЕРСКИЕ ССЫЛКИ (ШАБЛОННЫЕ)
+        // Замените на свои реферальные ссылки
+        // ==========================================
+        const BOOKMAKERS = [
+            { name: "1xBet",   color: "#1a6cb4", emoji: "1x", url: "https://1xbet.com/?ref=YOUR_REF_ID" },
+            { name: "Fonbet",  color: "#e44d26", emoji: "FB", url: "https://fonbet.com/?ref=YOUR_REF_ID" },
+            { name: "Winline", color: "#c9a800", emoji: "WL", url: "https://winline.ru/?ref=YOUR_REF_ID" },
+            { name: "BetBoom", color: "#ff6b35", emoji: "BB", url: "https://betboom.ru/?ref=YOUR_REF_ID" },
+            { name: "Leon",    color: "#dc3545", emoji: "LN", url: "https://leon.ru/?ref=YOUR_REF_ID" },
+            { name: "Melbet",  color: "#8b5cf6", emoji: "MB", url: "https://melbet.com/?ref=YOUR_REF_ID" },
+        ];
+
+        // Виды спорта
+        const SPORTS = [
+            { slug: "football",      name: "⚽ Футбол" },
+            { slug: "hockey",        name: "🏒 Хоккей" },
+            { slug: "basketball",    name: "🏀 Баскетбол" },
+            { slug: "tennis",        name: "🎾 Теннис" },
+            { slug: "volleyball",    name: "🏐 Волейбол" },
+            { slug: "handball",      name: "🤾 Гандбол" },
+            { slug: "baseball",      name: "⚾ Бейсбол" },
+            { slug: "mma",           name: "🥊 MMA/UFC" },
+            { slug: "table-tennis",  name: "🏓 Н.Теннис" },
+            { slug: "motorsport",    name: "🏎 Автоспорт" },
+        ];
+
+        // ==========================================
+        // ДЕМО ДАННЫЕ (замените на API вашего бэкенда)
+        // ==========================================
+        const DEMO_DATA = {
+            football: [
+                { id: "f1", league: "АПЛ", home: "Манчестер Сити", away: "Арсенал", sh: "2", sa: "1", live: true, time: "67'" },
+                { id: "f2", league: "Ла Лига", home: "Реал Мадрид", away: "Барселона", sh: "1", sa: "1", live: true, time: "45+2'" },
+                { id: "f3", league: "Серия А", home: "Наполи", away: "Интер", sh: "0", sa: "0", live: true, time: "12'" },
+                { id: "f4", league: "Бундеслига", home: "Бавария", away: "Бор. Дортмунд", sh: "3", sa: "2", live: true, time: "78'" },
+                { id: "f5", league: "Лига Чемпионов", home: "ПСЖ", away: "Ливерпуль", sh: "—", sa: "—", live: false, time: "21:00" },
+                { id: "f6", league: "Лига 1", home: "Марсель", away: "Лион", sh: "1", sa: "0", live: true, time: "34'" },
+            ],
+            hockey: [
+                { id: "h1", league: "НХЛ", home: "Кэпиталз", away: "Пингвинз", sh: "3", sa: "2", live: true, time: "2-й период" },
+                { id: "h2", league: "КХЛ", home: "ЦСКА", away: "СКА", sh: "1", sa: "0", live: true, time: "1-й период" },
+                { id: "h3", league: "НХЛ", home: "Мейпл Лифс", away: "Брюинз", sh: "—", sa: "—", live: false, time: "02:00" },
+            ],
+            basketball: [
+                { id: "b1", league: "НБА", home: "Лейкерс", away: "Селтикс", sh: "98", sa: "102", live: true, time: "3-я четв." },
+                { id: "b2", league: "Евролига", home: "ЦСКА", away: "Реал Мадрид", sh: "67", sa: "72", live: true, time: "3-я четв." },
+            ],
+            tennis: [
+                { id: "t1", league: "ATP", home: "Джокович Н.", away: "Синнер Я.", sh: "2", sa: "1", live: true, time: "4-й сет" },
+                { id: "t2", league: "WTA", home: "Швёнтек И.", away: "Соболенко А.", sh: "1", sa: "0", live: true, time: "2-й сет" },
+            ],
+            volleyball: [
+                { id: "v1", league: "Лига Наций", home: "Россия", away: "Бразилия", sh: "2", sa: "1", live: true, time: "4-й сет" },
+            ],
+            handball: [
+                { id: "hb1", league: "Лига Чемпионов", home: "Барселона", away: "Киль", sh: "25", sa: "23", live: true, time: "2-й тайм" },
+            ],
+            baseball: [
+                { id: "bb1", league: "MLB", home: "Yankees", away: "Red Sox", sh: "4", sa: "3", live: true, time: "6-й иннинг" },
+            ],
+            mma: [
+                { id: "m1", league: "UFC Fight Night", home: "Боец 1", away: "Боец 2", sh: "—", sa: "—", live: true, time: "2-й раунд" },
+            ],
+            "table-tennis": [
+                { id: "tt1", league: "ITTF World Tour", home: "Ма Лонг", away: "Фань Чжэньдун", sh: "2", sa: "1", live: true, time: "4-й сет" },
+            ],
+            motorsport: [
+                { id: "ms1", league: "Формула-1", home: "Квалификация", away: "Гран-при Монако", sh: "—", sa: "—", live: true, time: "" },
+            ],
+        };
+
+        // ==========================================
+        // ЛОГИКА
+        // ==========================================
+        let currentSport = "football";
+
+        function init() {
+            renderTabs();
+            selectSport("football");
+        }
+
+        function renderTabs() {
+            const container = document.getElementById("sportTabs");
+            container.innerHTML = SPORTS.map(s =>
+                `<div class="sport-tab ${s.slug === currentSport ? 'active' : ''}"
+                     onclick="selectSport('${s.slug}')">${s.name}</div>`
+            ).join('');
+        }
+
+        function selectSport(slug) {
+            currentSport = slug;
+            renderTabs();
+            showLoading();
+            // Имитация загрузки (замените на реальный API-запрос)
+            setTimeout(() => {
+                const matches = DEMO_DATA[slug] || [];
+                renderMatches(matches);
+            }, 400);
+        }
+
+        function showLoading() {
+            document.getElementById("content").innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Загрузка матчей...</span>
+                </div>`;
+        }
+
+        function renderMatches(matches) {
+            const container = document.getElementById("content");
+            if (!matches.length) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">😔</div>
+                        <p>Нет live-трансляций<br>в этой категории</p>
+                    </div>`;
+                return;
+            }
+            container.innerHTML = '<div class="matches-list">' +
+                matches.map(m => `
+                    <div class="match-card ${m.live ? 'live' : ''}" onclick='openDetail(${JSON.stringify(m)})'>
+                        <div class="match-league">
+                            ${m.live ? '<span class="live-badge">LIVE</span>' : ''}
+                            <span>${esc(m.league)}</span>
+                        </div>
+                        <div class="match-teams">
+                            <div class="match-team home">${esc(m.home)}</div>
+                            <div class="match-score">${esc(m.sh)} : ${esc(m.sa)}</div>
+                            <div class="match-team away">${esc(m.away)}</div>
+                        </div>
+                        ${m.time ? `<div class="match-time">⏱ ${esc(m.time)}</div>` : ''}
+                    </div>
+                `).join('') +
+            '</div>';
+        }
+
+        function openDetail(match) {
+            const panel = document.getElementById("detailPanel");
+            panel.innerHTML = `
+                <div class="detail-handle"></div>
+                <div class="detail-header">
+                    <div class="detail-league">${match.live ? '🔴 LIVE — ' : ''}${esc(match.league)}</div>
+                    <div class="detail-teams">
+                        <div class="detail-team-name">${esc(match.home)}</div>
+                        <div class="detail-score-big">${esc(match.sh)}:${esc(match.sa)}</div>
+                        <div class="detail-team-name">${esc(match.away)}</div>
+                    </div>
+                    ${match.time ? `<div class="detail-time">⏱ ${esc(match.time)}</div>` : ''}
+                </div>
+
+                <div class="bk-section">
+                    <div class="bk-title">📊 Коэффициенты букмекеров</div>
+                    <div class="bk-list">
+                        ${BOOKMAKERS.map(bk => `
+                            <a href="${bk.url}" target="_blank" rel="noopener" class="bk-item">
+                                <div class="bk-logo" style="background:${bk.color}">${bk.emoji}</div>
+                                <div class="bk-name">${bk.name}</div>
+                                <div class="bk-go">Перейти →</div>
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>ℹ️ Информация о матче</h3>
+                    <div class="info-row">
+                        <span class="info-label">Турнир</span>
+                        <span class="info-value">${esc(match.league)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Хозяева</span>
+                        <span class="info-value">${esc(match.home)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Гости</span>
+                        <span class="info-value">${esc(match.away)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Счёт</span>
+                        <span class="info-value">${esc(match.sh)} : ${esc(match.sa)}</span>
+                    </div>
+                    ${match.time ? `<div class="info-row">
+                        <span class="info-label">Время</span>
+                        <span class="info-value">${esc(match.time)}</span>
+                    </div>` : ''}
+                    <div class="info-row">
+                        <span class="info-label">Статус</span>
+                        <span class="info-value">${match.live ? '🔴 LIVE' : '🕐 Запланирован'}</span>
+                    </div>
+                </div>
+
+                <button class="close-btn" onclick="closeOverlay()">✕ Закрыть</button>
+            `;
+            document.getElementById("overlay").classList.add("open");
+        }
+
+        function closeDetail(e) {
+            if (e.target === document.getElementById("overlay")) closeOverlay();
+        }
+        function closeOverlay() {
+            document.getElementById("overlay").classList.remove("open");
+        }
+
+        function esc(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        // Запуск
+        init();
+    </script>
+</body>
+</html>
