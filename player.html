@@ -108,14 +108,21 @@ const v=document.getElementById('v');
 const ld=document.getElementById('ld');
 const cg=document.getElementById('cg');
 
-// Блокируем все клики на guard, кроме зоны контролов видео (нижние 60px)
+// Блокируем все клики на guard — play/pause
 cg.addEventListener('click', function(e){
     e.preventDefault();
     e.stopPropagation();
-    // При клике на guard — play/pause видео
     if(v.paused) v.play().catch(()=>{});
     else v.pause();
 }, true);
+
+// При fullscreen убираем guard чтобы контролы работали
+document.addEventListener('fullscreenchange', ()=>{
+    cg.style.display = document.fullscreenElement ? 'none' : 'block';
+});
+document.addEventListener('webkitfullscreenchange', ()=>{
+    cg.style.display = document.webkitFullscreenElement ? 'none' : 'block';
+});
 
 // Блокируем все window.open, location изменения
 window.open = function(){return null};
@@ -144,24 +151,57 @@ function err(m){
 }
 
 if(S){
-    if(Hls.isSupported()){
-        const h=new Hls({maxBufferLength:30,maxMaxBufferLength:60});
-        h.loadSource(S);
-        h.attachMedia(v);
-        h.on(Hls.Events.MANIFEST_PARSED,()=>{
-            ld.style.display='none';
-            v.play().catch(()=>{});
-        });
-        h.on(Hls.Events.ERROR,(e,d)=>{
-            if(d.fatal) err('Не удалось загрузить трансляцию');
-        });
-    } else if(v.canPlayType('application/vnd.apple.mpegurl')){
-        v.src=S;
-        v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()});
-    } else {
-        err('Браузер не поддерживает HLS');
+    // Пробуем напрямую, если не получится — через CORS прокси
+    const proxies = [
+        S,  // прямой
+        'https://corsproxy.io/?' + encodeURIComponent(S),
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(S),
+    ];
+    
+    let proxyIdx = 0;
+    
+    function tryLoad(url){
+        if(Hls.isSupported()){
+            const h=new Hls({
+                maxBufferLength:30,
+                maxMaxBufferLength:60,
+                xhrSetup: function(xhr){
+                    xhr.withCredentials = false;
+                }
+            });
+            h.loadSource(url);
+            h.attachMedia(v);
+            h.on(Hls.Events.MANIFEST_PARSED,()=>{
+                ld.style.display='none';
+                v.play().catch(()=>{});
+            });
+            h.on(Hls.Events.ERROR,(e,d)=>{
+                if(d.fatal){
+                    h.destroy();
+                    proxyIdx++;
+                    if(proxyIdx < proxies.length){
+                        console.log('Trying proxy:', proxies[proxyIdx]);
+                        tryLoad(proxies[proxyIdx]);
+                    } else {
+                        err('Не удалось загрузить трансляцию');
+                    }
+                }
+            });
+        } else if(v.canPlayType('application/vnd.apple.mpegurl')){
+            v.src=url;
+            v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()});
+            v.addEventListener('error',()=>{
+                proxyIdx++;
+                if(proxyIdx < proxies.length) tryLoad(proxies[proxyIdx]);
+                else err('Не удалось загрузить');
+            });
+        } else {
+            err('Браузер не поддерживает HLS');
+        }
     }
-    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},20000);
+    
+    tryLoad(proxies[0]);
+    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
 } else {
     err('Трансляция недоступна');
 }
