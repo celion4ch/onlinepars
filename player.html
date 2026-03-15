@@ -17,15 +17,14 @@
         .lb::before{content:'';width:5px;height:5px;background:#fff;border-radius:50%;animation:pulse 1.5s infinite}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         
-        .pc{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
-        .video-wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+        .pc{flex:1;position:relative;background:#000;overflow:hidden}
         video{width:100%;height:100%;object-fit:contain;background:#000}
         
-        /* RUBOT плашка — правый верхний угол ВИДЕО */
+        /* RUBOT плашка — всегда поверх, даже в fullscreen */
         .rubot{
-            position:absolute;
-            top:8px;right:8px;
-            z-index:25;
+            position:fixed;
+            top:50px;right:10px;
+            z-index:2147483647;
             pointer-events:none;
             user-select:none;
             display:flex;
@@ -52,22 +51,12 @@
             text-shadow:0 1px 2px rgba(0,0,0,0.4);
         }
         
-        /* Водяной знак по центру */
         .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;font-weight:900;color:rgba(255,68,68,.04);letter-spacing:8px;pointer-events:none;z-index:10;user-select:none}
         
         .ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5}
         .sp{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:#ff4444;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 10px}
         @keyframes spin{to{transform:rotate(360deg)}}
         .er{text-align:center;padding:30px;color:rgba(255,255,255,.6);font-size:13px}
-        .er a{color:#ff4444;text-decoration:none;font-weight:600;display:inline-block;margin-top:10px}
-        
-        /* Блокируем все ссылки/переходы внутри плеера */
-        .click-guard{
-            position:absolute;
-            top:0;left:0;right:0;bottom:60px;
-            z-index:15;
-            cursor:default;
-        }
     </style>
 </head>
 <body>
@@ -76,132 +65,97 @@
     <div class="mi"><span class="lb">LIVE</span> <span id="t"></span></div>
 </div>
 <div class="pc">
-    <div class="video-wrap">
-        <video id="v" controls autoplay playsinline></video>
-        <!-- RUBOT плашка — прямо на видео -->
-        <div class="rubot">
-            <div class="rubot-icon">R</div>
-            <div class="rubot-text">RUBOT</div>
-        </div>
-        <!-- Блокировщик кликов -->
-        <div class="click-guard" id="cg"></div>
-    </div>
-    
+    <video id="v" controls autoplay playsinline></video>
+    <div class="wm">RUBOT</div>
     <div class="ld" id="ld">
         <div class="sp"></div>
         <div style="color:rgba(255,255,255,.5);font-size:12px">Загрузка трансляции...</div>
     </div>
 </div>
+
+<!-- RUBOT плашка — position:fixed, остаётся при fullscreen -->
+<div class="rubot" id="rubot">
+    <div class="rubot-icon">R</div>
+    <div class="rubot-text">RUBOT</div>
+</div>
+
 <script>
-// Telegram WebApp
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();tg.setHeaderColor('#000');tg.setBackgroundColor('#000')}
 
 const P=new URLSearchParams(location.search);
 const S=P.get('stream');
-const F=P.get('fallback')||'';
 const T=P.get('teams')||'';
 
 document.getElementById('t').textContent=T?' '+T:'';
 
 const v=document.getElementById('v');
 const ld=document.getElementById('ld');
-const cg=document.getElementById('cg');
 
-// Блокируем все клики на guard — play/pause
-cg.addEventListener('click', function(e){
-    e.preventDefault();
-    e.stopPropagation();
-    if(v.paused) v.play().catch(()=>{});
-    else v.pause();
-}, true);
-
-// При fullscreen убираем guard чтобы контролы работали
-document.addEventListener('fullscreenchange', ()=>{
-    cg.style.display = document.fullscreenElement ? 'none' : 'block';
-});
-document.addEventListener('webkitfullscreenchange', ()=>{
-    cg.style.display = document.webkitFullscreenElement ? 'none' : 'block';
-});
-
-// Блокируем все window.open, location изменения
-window.open = function(){return null};
-const origAssign = location.assign;
-const origReplace = location.replace;
-
-// Позиционируем RUBOT плашку точно на видео
-const rubot = document.querySelector('.rubot');
-function posRubot(){
-    if(!v.videoWidth) return;
-    const cw=v.clientWidth, ch=v.clientHeight;
-    const vw=v.videoWidth, vh=v.videoHeight;
-    const scale=Math.min(cw/vw, ch/vh);
-    const rw=vw*scale, rh=vh*scale;
-    const offX=(cw-rw)/2, offY=(ch-rh)/2;
-    rubot.style.top=(offY+6)+'px';
-    rubot.style.right=(offX+6)+'px';
-}
-v.addEventListener('loadeddata', posRubot);
-v.addEventListener('resize', posRubot);
-window.addEventListener('resize', posRubot);
-setInterval(posRubot, 2000);
+// Блокируем редиректы
+window.open=function(){return null};
 
 function err(m){
-    ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Открыть на сайте ↗</a>':'')+'</div>';
+    ld.innerHTML='<div class="er"><p>'+m+'</p></div>';
 }
 
 if(S){
-    // Пробуем напрямую, если не получится — через CORS прокси
-    const proxies = [
-        S,  // прямой
-        'https://corsproxy.io/?' + encodeURIComponent(S),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(S),
+    // Список прокси для обхода CORS
+    const proxies=[
+        S,
+        'https://corsproxy.io/?'+encodeURIComponent(S),
+        'https://api.allorigins.win/raw?url='+encodeURIComponent(S),
+        'https://proxy.cors.sh/'+S,
+        'https://thingproxy.freeboard.io/fetch/'+S,
     ];
     
-    let proxyIdx = 0;
+    let idx=0;
     
     function tryLoad(url){
+        console.log('Loading:',url.substring(0,80));
+        
         if(Hls.isSupported()){
             const h=new Hls({
                 maxBufferLength:30,
                 maxMaxBufferLength:60,
-                xhrSetup: function(xhr){
-                    xhr.withCredentials = false;
-                }
+                xhrSetup:function(xhr){xhr.withCredentials=false}
             });
             h.loadSource(url);
             h.attachMedia(v);
+            
+            let loaded=false;
             h.on(Hls.Events.MANIFEST_PARSED,()=>{
+                loaded=true;
                 ld.style.display='none';
                 v.play().catch(()=>{});
             });
             h.on(Hls.Events.ERROR,(e,d)=>{
-                if(d.fatal){
+                if(d.fatal && !loaded){
                     h.destroy();
-                    proxyIdx++;
-                    if(proxyIdx < proxies.length){
-                        console.log('Trying proxy:', proxies[proxyIdx]);
-                        tryLoad(proxies[proxyIdx]);
+                    idx++;
+                    if(idx<proxies.length){
+                        setTimeout(()=>tryLoad(proxies[idx]),1000);
                     } else {
                         err('Не удалось загрузить трансляцию');
                     }
                 }
             });
         } else if(v.canPlayType('application/vnd.apple.mpegurl')){
+            // iOS Safari — нативная HLS поддержка
             v.src=url;
             v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()});
             v.addEventListener('error',()=>{
-                proxyIdx++;
-                if(proxyIdx < proxies.length) tryLoad(proxies[proxyIdx]);
-                else err('Не удалось загрузить');
+                idx++;
+                if(idx<proxies.length) tryLoad(proxies[idx]);
+                else err('Не удалось загрузить трансляцию');
             });
         } else {
-            err('Браузер не поддерживает HLS');
+            err('Браузер не поддерживает воспроизведение');
         }
     }
     
     tryLoad(proxies[0]);
-    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
+    setTimeout(()=>{if(ld.style.display!=='none')err('Не удалось загрузить трансляцию')},45000);
 } else {
     err('Трансляция недоступна');
 }
