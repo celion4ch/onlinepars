@@ -18,38 +18,38 @@
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         
         .pc{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+        .video-wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
         video{width:100%;height:100%;object-fit:contain;background:#000}
         
-        /* RUBOT плашка — правый верхний угол */
+        /* RUBOT плашка — правый верхний угол ВИДЕО */
         .rubot{
             position:absolute;
-            top:10px;right:10px;
-            z-index:20;
+            top:8px;right:8px;
+            z-index:25;
             pointer-events:none;
             user-select:none;
             display:flex;
             align-items:center;
-            gap:6px;
-            background:linear-gradient(135deg, rgba(255,68,68,0.85), rgba(255,120,0,0.85));
-            padding:5px 12px;
-            border-radius:8px;
-            box-shadow:0 2px 12px rgba(255,68,68,0.4), 0 0 20px rgba(255,68,68,0.15);
-            backdrop-filter:blur(4px);
+            gap:5px;
+            background:linear-gradient(135deg, rgba(255,68,68,0.9), rgba(255,120,0,0.9));
+            padding:4px 10px;
+            border-radius:6px;
+            box-shadow:0 2px 10px rgba(0,0,0,0.5), 0 0 15px rgba(255,68,68,0.3);
         }
         .rubot-icon{
-            width:18px;height:18px;
+            width:16px;height:16px;
             background:#fff;
-            border-radius:4px;
+            border-radius:3px;
             display:flex;align-items:center;justify-content:center;
-            font-size:10px;font-weight:900;color:#ff4444;
+            font-size:9px;font-weight:900;color:#ff4444;
             line-height:1;
         }
         .rubot-text{
-            font-size:14px;
+            font-size:12px;
             font-weight:800;
             color:#fff;
             letter-spacing:1.5px;
-            text-shadow:0 1px 3px rgba(0,0,0,0.3);
+            text-shadow:0 1px 2px rgba(0,0,0,0.4);
         }
         
         /* Водяной знак по центру */
@@ -76,19 +76,16 @@
     <div class="mi"><span class="lb">LIVE</span> <span id="t"></span></div>
 </div>
 <div class="pc">
-    <video id="v" controls autoplay playsinline></video>
-    
-    <!-- RUBOT плашка -->
-    <div class="rubot">
-        <div class="rubot-icon">R</div>
-        <div class="rubot-text">RUBOT</div>
+    <div class="video-wrap">
+        <video id="v" controls autoplay playsinline></video>
+        <!-- RUBOT плашка — прямо на видео -->
+        <div class="rubot">
+            <div class="rubot-icon">R</div>
+            <div class="rubot-text">RUBOT</div>
+        </div>
+        <!-- Блокировщик кликов -->
+        <div class="click-guard" id="cg"></div>
     </div>
-    
-    <!-- Водяной знак -->
-    <div class="wm">RUBOT</div>
-    
-    <!-- Блокировщик кликов — не даёт перейти по ссылкам плеера -->
-    <div class="click-guard" id="cg"></div>
     
     <div class="ld" id="ld">
         <div class="sp"></div>
@@ -124,6 +121,23 @@ cg.addEventListener('click', function(e){
 window.open = function(){return null};
 const origAssign = location.assign;
 const origReplace = location.replace;
+
+// Позиционируем RUBOT плашку точно на видео
+const rubot = document.querySelector('.rubot');
+function posRubot(){
+    if(!v.videoWidth) return;
+    const cw=v.clientWidth, ch=v.clientHeight;
+    const vw=v.videoWidth, vh=v.videoHeight;
+    const scale=Math.min(cw/vw, ch/vh);
+    const rw=vw*scale, rh=vh*scale;
+    const offX=(cw-rw)/2, offY=(ch-rh)/2;
+    rubot.style.top=(offY+6)+'px';
+    rubot.style.right=(offX+6)+'px';
+}
+v.addEventListener('loadeddata', posRubot);
+v.addEventListener('resize', posRubot);
+window.addEventListener('resize', posRubot);
+setInterval(posRubot, 2000);
 
 function err(m){
     ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Открыть на сайте ↗</a>':'')+'</div>';
