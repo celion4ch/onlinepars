@@ -17,46 +17,55 @@
         .lb::before{content:'';width:5px;height:5px;background:#fff;border-radius:50%;animation:pulse 1.5s infinite}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         
+        /* Контейнер плеера */
         .pc{flex:1;position:relative;background:#000;overflow:hidden}
+        
+        /* Обёртка видео — становится fullscreen */
+        .vw{position:relative;width:100%;height:100%}
         video{width:100%;height:100%;object-fit:contain;background:#000}
         
-        /* RUBOT плашка — всегда поверх, даже в fullscreen */
+        /* RUBOT — всегда в правом верхнем углу видео */
         .rubot{
-            position:fixed;
-            top:50px;right:10px;
-            z-index:2147483647;
+            position:absolute;
+            top:5px;right:5px;
+            z-index:9999;
             pointer-events:none;
             user-select:none;
             display:flex;
             align-items:center;
-            gap:5px;
-            background:linear-gradient(135deg, rgba(255,68,68,0.9), rgba(255,120,0,0.9));
-            padding:4px 10px;
-            border-radius:6px;
-            box-shadow:0 2px 10px rgba(0,0,0,0.5), 0 0 15px rgba(255,68,68,0.3);
+            gap:4px;
+            background:linear-gradient(135deg, rgba(255,68,68,0.92), rgba(255,120,0,0.92));
+            padding:3px 8px;
+            border-radius:5px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.6);
         }
-        .rubot-icon{
-            width:16px;height:16px;
-            background:#fff;
-            border-radius:3px;
+        .rubot b{font-size:11px;font-weight:800;color:#fff;letter-spacing:1px}
+        .rubot i{
+            width:14px;height:14px;background:#fff;border-radius:3px;
             display:flex;align-items:center;justify-content:center;
-            font-size:9px;font-weight:900;color:#ff4444;
-            line-height:1;
-        }
-        .rubot-text{
-            font-size:12px;
-            font-weight:800;
-            color:#fff;
-            letter-spacing:1.5px;
-            text-shadow:0 1px 2px rgba(0,0,0,0.4);
+            font-size:8px;font-weight:900;color:#ff4444;font-style:normal;
         }
         
-        .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;font-weight:900;color:rgba(255,68,68,.04);letter-spacing:8px;pointer-events:none;z-index:10;user-select:none}
+        /* RUBOT видим в fullscreen */
+        .vw:fullscreen .rubot,
+        .vw:-webkit-full-screen .rubot,
+        .vw:-moz-full-screen .rubot{
+            display:flex !important;
+            position:absolute !important;
+            top:5px !important;right:5px !important;
+            z-index:2147483647 !important;
+        }
+        
+        /* Click guard — блокирует переходы, НЕ в fullscreen */
+        .cg{position:absolute;top:0;left:0;right:0;bottom:50px;z-index:9998;cursor:default}
+        .vw:fullscreen .cg,
+        .vw:-webkit-full-screen .cg{display:none}
         
         .ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5}
         .sp{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:#ff4444;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 10px}
         @keyframes spin{to{transform:rotate(360deg)}}
         .er{text-align:center;padding:30px;color:rgba(255,255,255,.6);font-size:13px}
+        .er a{color:#ff4444;text-decoration:none;font-weight:600;display:inline-block;margin-top:10px}
     </style>
 </head>
 <body>
@@ -65,100 +74,66 @@
     <div class="mi"><span class="lb">LIVE</span> <span id="t"></span></div>
 </div>
 <div class="pc">
-    <video id="v" controls autoplay playsinline></video>
-    <div class="wm">RUBOT</div>
+    <!-- Обёртка — именно она уходит в fullscreen -->
+    <div class="vw" id="vw">
+        <video id="v" controls autoplay playsinline></video>
+        <div class="rubot"><i>R</i><b>RUBOT</b></div>
+        <div class="cg" id="cg"></div>
+    </div>
     <div class="ld" id="ld">
         <div class="sp"></div>
-        <div style="color:rgba(255,255,255,.5);font-size:12px">Загрузка трансляции...</div>
+        <div style="color:rgba(255,255,255,.5);font-size:12px">Загрузка...</div>
     </div>
 </div>
-
-<!-- RUBOT плашка — position:fixed, остаётся при fullscreen -->
-<div class="rubot" id="rubot">
-    <div class="rubot-icon">R</div>
-    <div class="rubot-text">RUBOT</div>
-</div>
-
 <script>
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();tg.setHeaderColor('#000');tg.setBackgroundColor('#000')}
 
 const P=new URLSearchParams(location.search);
 const S=P.get('stream');
+const F=P.get('fallback')||'';
 const T=P.get('teams')||'';
-
 document.getElementById('t').textContent=T?' '+T:'';
 
 const v=document.getElementById('v');
 const ld=document.getElementById('ld');
+const cg=document.getElementById('cg');
 
-// Блокируем редиректы
+// Click guard — play/pause, без переходов
+cg.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(v.paused)v.play().catch(()=>{});else v.pause();
+},true);
+
+// Блокируем window.open
 window.open=function(){return null};
 
 function err(m){
-    ld.innerHTML='<div class="er"><p>'+m+'</p></div>';
+    ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Смотреть на сайте ↗</a>':'')+'</div>';
 }
 
 if(S){
-    // Список прокси для обхода CORS
     const proxies=[
         S,
         'https://corsproxy.io/?'+encodeURIComponent(S),
         'https://api.allorigins.win/raw?url='+encodeURIComponent(S),
-        'https://proxy.cors.sh/'+S,
-        'https://thingproxy.freeboard.io/fetch/'+S,
     ];
-    
-    let idx=0;
-    
+    let pi=0;
     function tryLoad(url){
-        console.log('Loading:',url.substring(0,80));
-        
         if(Hls.isSupported()){
-            const h=new Hls({
-                maxBufferLength:30,
-                maxMaxBufferLength:60,
-                xhrSetup:function(xhr){xhr.withCredentials=false}
-            });
-            h.loadSource(url);
-            h.attachMedia(v);
-            
-            let loaded=false;
-            h.on(Hls.Events.MANIFEST_PARSED,()=>{
-                loaded=true;
-                ld.style.display='none';
-                v.play().catch(()=>{});
-            });
-            h.on(Hls.Events.ERROR,(e,d)=>{
-                if(d.fatal && !loaded){
-                    h.destroy();
-                    idx++;
-                    if(idx<proxies.length){
-                        setTimeout(()=>tryLoad(proxies[idx]),1000);
-                    } else {
-                        err('Не удалось загрузить трансляцию');
-                    }
-                }
-            });
-        } else if(v.canPlayType('application/vnd.apple.mpegurl')){
-            // iOS Safari — нативная HLS поддержка
+            const h=new Hls({maxBufferLength:30,maxMaxBufferLength:60,xhrSetup:function(x){x.withCredentials=false}});
+            h.loadSource(url);h.attachMedia(v);
+            h.on(Hls.Events.MANIFEST_PARSED,()=>{ld.style.display='none';v.play().catch(()=>{})});
+            h.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal){h.destroy();pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Не удалось загрузить')}});
+        }else if(v.canPlayType('application/vnd.apple.mpegurl')){
             v.src=url;
             v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()});
-            v.addEventListener('error',()=>{
-                idx++;
-                if(idx<proxies.length) tryLoad(proxies[idx]);
-                else err('Не удалось загрузить трансляцию');
-            });
-        } else {
-            err('Браузер не поддерживает воспроизведение');
-        }
+            v.addEventListener('error',()=>{pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Ошибка загрузки')});
+        }else err('HLS не поддерживается');
     }
-    
     tryLoad(proxies[0]);
-    setTimeout(()=>{if(ld.style.display!=='none')err('Не удалось загрузить трансляцию')},45000);
-} else {
-    err('Трансляция недоступна');
-}
+    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
+}else err('Трансляция недоступна');
 </script>
 </body>
 </html>
