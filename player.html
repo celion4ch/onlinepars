@@ -5,206 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LiveBall — Трансляция</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            background: #0a0a0f;
-            color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            padding: 8px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            min-height: 44px;
-            flex-shrink: 0;
-        }
-
-        .logo {
-            font-size: 18px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #ff4444, #ff8800);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 1px;
-        }
-
-        .match-info {
-            font-size: 12px;
-            color: rgba(255,255,255,0.7);
-            text-align: right;
-            max-width: 60%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .player-container {
-            flex: 1;
-            position: relative;
-            background: #000;
-            overflow: hidden;
-        }
-
-        .player-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        .watermark {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 48px;
-            font-weight: 900;
-            color: rgba(255, 68, 68, 0.08);
-            letter-spacing: 8px;
-            pointer-events: none;
-            z-index: 10;
-            user-select: none;
-        }
-
-        .live-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: #e53935;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .live-badge::before {
-            content: '';
-            width: 6px;
-            height: 6px;
-            background: white;
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        .loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            gap: 16px;
-        }
-
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top-color: #ff4444;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .error-msg {
-            text-align: center;
-            padding: 40px 20px;
-            color: rgba(255,255,255,0.6);
-        }
-
-        .error-msg a {
-            color: #ff4444;
-            text-decoration: none;
-            font-weight: 600;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+        .hdr{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.1);min-height:36px;flex-shrink:0}
+        .logo{font-size:16px;font-weight:800;background:linear-gradient(135deg,#ff4444,#ff8800);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .mi{font-size:11px;color:rgba(255,255,255,.7);text-align:right;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .lb{display:inline-flex;align-items:center;gap:3px;background:#e53935;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700}
+        .lb::before{content:'';width:5px;height:5px;background:#fff;border-radius:50%;animation:p 1.5s infinite}
+        @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+        .pc{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center}
+        video{width:100%;height:100%;object-fit:contain;background:#000}
+        .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:900;color:rgba(255,68,68,.06);letter-spacing:6px;pointer-events:none;z-index:10;user-select:none}
+        .ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+        .sp{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:#ff4444;border-radius:50%;animation:s 1s linear infinite;margin:0 auto 10px}
+        @keyframes s{to{transform:rotate(360deg)}}
+        .er{text-align:center;padding:30px;color:rgba(255,255,255,.6);font-size:13px}
+        .er a{color:#ff4444;text-decoration:none;font-weight:600;display:inline-block;margin-top:10px}
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">LIVEBALL</div>
-        <div class="match-info">
-            <span class="live-badge">LIVE</span>
-            <span id="matchTitle"></span>
-        </div>
-    </div>
-
-    <div class="player-container" id="playerContainer">
-        <div class="loading" id="loading">
-            <div class="loading-spinner"></div>
-            <div style="color: rgba(255,255,255,0.5); font-size: 14px;">Загрузка трансляции...</div>
-        </div>
-        <div class="watermark">LIVEBALL</div>
-    </div>
-
-    <script>
-        // Инициализация Telegram WebApp
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-            tg.setHeaderColor('#0a0a0f');
-            tg.setBackgroundColor('#0a0a0f');
-        }
-
-        // Получаем параметры из URL
-        const params = new URLSearchParams(window.location.search);
-        const matchUrl = params.get('url');  // URL матча на liveball.sx
-        const teams = params.get('teams') || '';
-
-        // Показываем название матча
-        document.getElementById('matchTitle').textContent = teams ? ` ${teams}` : '';
-
-        if (matchUrl) {
-            const container = document.getElementById('playerContainer');
-            const loading = document.getElementById('loading');
-
-            // Создаём iframe с трансляцией
-            const iframe = document.createElement('iframe');
-            iframe.src = matchUrl;
-            iframe.allow = 'autoplay; fullscreen; encrypted-media';
-            iframe.allowFullscreen = true;
-            
-            iframe.onload = () => {
-                loading.style.display = 'none';
-            };
-
-            // Таймаут — если iframe не загрузился за 15 сек
-            setTimeout(() => {
-                if (loading.style.display !== 'none') {
-                    loading.innerHTML = `
-                        <div class="error-msg">
-                            <p>Трансляция загружается...</p>
-                            <p style="margin-top:12px">
-                                <a href="${matchUrl}" target="_blank">Открыть на сайте ↗</a>
-                            </p>
-                        </div>
-                    `;
-                }
-            }, 15000);
-
-            container.insertBefore(iframe, container.firstChild);
-        } else {
-            document.getElementById('loading').innerHTML = `
-                <div class="error-msg">
-                    <p>Ссылка на трансляцию не указана</p>
-                </div>
-            `;
-        }
-    </script>
+<div class="hdr"><div class="logo">LIVEBALL</div><div class="mi"><span class="lb">LIVE</span> <span id="t"></span></div></div>
+<div class="pc">
+    <video id="v" controls autoplay playsinline></video>
+    <div class="wm">LIVEBALL</div>
+    <div class="ld" id="ld"><div class="sp"></div><div style="color:rgba(255,255,255,.5);font-size:12px">Загрузка...</div></div>
+</div>
+<script>
+const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand();tg.setHeaderColor('#000');tg.setBackgroundColor('#000')}
+const P=new URLSearchParams(location.search),S=P.get('stream'),F=P.get('fallback')||'',T=P.get('teams')||'';
+document.getElementById('t').textContent=T?' '+T:'';
+const v=document.getElementById('v'),ld=document.getElementById('ld');
+function err(m){ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Открыть на сайте ↗</a>':'')+'</div>'}
+if(S){
+    if(Hls.isSupported()){const h=new Hls({maxBufferLength:30});h.loadSource(S);h.attachMedia(v);h.on(Hls.Events.MANIFEST_PARSED,()=>{ld.style.display='none';v.play().catch(()=>{})});h.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal)err('Не удалось загрузить')})}
+    else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=S;v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()})}
+    else err('Браузер не поддерживает HLS');
+    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},20000)
+}else err('Трансляция недоступна')
+</script>
 </body>
 </html>
