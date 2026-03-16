@@ -56,10 +56,8 @@
             z-index:2147483647 !important;
         }
         
-        /* Click guard — блокирует переходы, НЕ в fullscreen */
-        .cg{position:absolute;top:0;left:0;right:0;bottom:50px;z-index:9998;cursor:default}
-        .vw:fullscreen .cg,
-        .vw:-webkit-full-screen .cg{display:none}
+        /* Click guard — блокирует переходы, оставляет контролы видео снизу */
+        .cg{position:absolute;top:0;left:0;right:0;bottom:70px;z-index:9998;cursor:default}
         
         .ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5}
         .sp{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:#ff4444;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 10px}
@@ -104,6 +102,19 @@ cg.addEventListener('click',function(e){
     e.preventDefault();e.stopPropagation();
     if(v.paused)v.play().catch(()=>{});else v.pause();
 },true);
+
+// Убираем click guard в fullscreen (на всех платформах включая мобилу)
+function onFsChange(){
+    var fs = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+    cg.style.display = fs ? 'none' : 'block';
+}
+document.addEventListener('fullscreenchange', onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
+document.addEventListener('mozfullscreenchange', onFsChange);
+document.addEventListener('MSFullscreenChange', onFsChange);
+// iOS Safari — слушаем на video элементе
+v.addEventListener('webkitbeginfullscreen', function(){ cg.style.display='none'; });
+v.addEventListener('webkitendfullscreen', function(){ cg.style.display='block'; });
 
 // Блокируем window.open
 window.open=function(){return null};
