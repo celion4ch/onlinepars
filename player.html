@@ -101,26 +101,61 @@ function err(m){
 }
 
 if(S){
-    // Если stream URL относительный или абсолютный — используем как есть
-    // Если это m3u8 — пропускаем через наш прокси (тот же сервер)
     var streamUrl = S;
-    if(S.includes('.m3u8') && !S.includes('/stream?')){
-        // Прямой m3u8 — пропускаем через прокси на этом же сервере
-        streamUrl = '/stream?url=' + encodeURIComponent(S);
-    }
     
     function startPlayer(url){
+        // Сначала пробуем нативный <video src> — обходит CORS на iOS/Safari/некоторых Android
+        v.src = url;
+        var nativeTimeout = setTimeout(function(){
+            // Нативный не загрузился за 8 сек — пробуем hls.js
+            v.removeAttribute('src');
+            tryHls(url);
+        }, 8000);
+        
+        v.addEventListener('loadeddata', function(){
+            clearTimeout(nativeTimeout);
+            ld.style.display='none';
+            v.play().catch(function(){});
+        }, {once:true});
+        
+        v.addEventListener('error', function(){
+            clearTimeout(nativeTimeout);
+            v.removeAttribute('src');
+            tryHls(url);
+        }, {once:true});
+    }
+    
+    function tryHls(url){
         if(Hls.isSupported()){
             var h=new Hls({maxBufferLength:30,maxMaxBufferLength:60,xhrSetup:function(x){x.withCredentials=false}});
             h.loadSource(url);h.attachMedia(v);
             h.on(Hls.Events.MANIFEST_PARSED,function(){ld.style.display='none';v.play().catch(function(){})});
-            h.on(Hls.Events.ERROR,function(e,d){if(d.fatal){h.destroy();err('Не удалось загрузить')}});
-        }else if(v.canPlayType('application/vnd.apple.mpegurl')){
-            v.src=url;
-            v.addEventListener('loadedmetadata',function(){ld.style.display='none';v.play()});
-            v.addEventListener('error',function(){err('Ошибка загрузки')});
-        }else err('HLS не поддерживается');
+            h.on(Hls.Events.ERROR,function(e,d){
+                if(d.fatal){
+                    h.destroy();
+                    // Последний шанс — CORS прокси
+                    tryCorsProxy(url);
+                }
+            });
+        }else{
+            tryCorsProxy(url);
+        }
     }
+    
+    function tryCorsProxy(url){
+        var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+        if(Hls.isSupported()){
+            var h2=new Hls({maxBufferLength:30,maxMaxBufferLength:60});
+            h2.loadSource(proxyUrl);h2.attachMedia(v);
+            h2.on(Hls.Events.MANIFEST_PARSED,function(){ld.style.display='none';v.play().catch(function(){})});
+            h2.on(Hls.Events.ERROR,function(e,d){if(d.fatal){h2.destroy();err('Не удалось загрузить')}});
+        }else{
+            v.src=proxyUrl;
+            v.addEventListener('loadeddata',function(){ld.style.display='none';v.play()},{once:true});
+            v.addEventListener('error',function(){err('Не удалось загрузить')},{once:true});
+        }
+    }
+    
     startPlayer(streamUrl);
     setTimeout(function(){if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
 }else err('Трансляция недоступна');
