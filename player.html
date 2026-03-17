@@ -24,10 +24,9 @@
         .vw{position:relative;width:100%;height:100%;background:#000}
         video{width:100%;height:100%;object-fit:contain;background:#000}
         
-        /* RUBOT — правый верхний угол, всегда поверх */
+        /* RUBOT — позиционируется JS-ом точно на видео */
         .rubot{
             position:absolute;
-            top:5px;right:5px;
             z-index:2147483647;
             pointer-events:none;
             user-select:none;
@@ -38,6 +37,7 @@
             padding:3px 8px;
             border-radius:5px;
             box-shadow:0 2px 8px rgba(0,0,0,0.6);
+            transition:top 0.3s,right 0.3s;
         }
         .rubot b{font-size:11px;font-weight:800;color:#fff;letter-spacing:1px}
         .rubot i{
@@ -46,17 +46,14 @@
             font-size:8px;font-weight:900;color:#ff4444;font-style:normal;
         }
         
-        /* Fullscreen на .vw контейнере — RUBOT виден */
+        /* Fullscreen */
         .vw:fullscreen,
         .vw:-webkit-full-screen{
-            width:100vw !important;height:100vh !important;background:#000;
+            width:100vw!important;height:100vh!important;background:#000;
         }
         .vw:fullscreen .rubot,
         .vw:-webkit-full-screen .rubot{
-            display:flex !important;
-            position:absolute !important;
-            top:5px !important;right:5px !important;
-            z-index:2147483647 !important;
+            display:flex!important;
         }
         
         /* Click guard убран — мешал fullscreen на мобиле */
@@ -110,31 +107,37 @@ document.addEventListener('click',function(e){
     }
 },true);
 
-// Перехватываем fullscreen — делаем на .vw, не на video
-// Так RUBOT остаётся виден
+// Fullscreen через .vw (чтобы RUBOT был виден на десктопе)
 const vw=document.getElementById('vw');
-v.addEventListener('dblclick',function(e){
-    e.preventDefault();
-    if(document.fullscreenElement||document.webkitFullscreenElement){
-        (document.exitFullscreen||document.webkitExitFullscreen).call(document);
-    } else {
-        (vw.requestFullscreen||vw.webkitRequestFullscreen).call(vw);
-    }
-});
+const rubot=document.querySelector('.rubot');
 
-// Для мобилы: перехватываем нативный fullscreen запрос от video контролов
-// и перенаправляем на .vw
-var origReqFs = HTMLElement.prototype.requestFullscreen || HTMLElement.prototype.webkitRequestFullscreen;
+// Перехватываем fullscreen video → fullscreen .vw
+var origReqFs=HTMLElement.prototype.requestFullscreen||HTMLElement.prototype.webkitRequestFullscreen;
 if(origReqFs){
-    HTMLVideoElement.prototype.requestFullscreen = function(){return origReqFs.call(vw)};
-    if(HTMLVideoElement.prototype.webkitRequestFullscreen){
-        HTMLVideoElement.prototype.webkitRequestFullscreen = function(){return origReqFs.call(vw)};
-    }
-    // iOS Safari
-    if(HTMLVideoElement.prototype.webkitEnterFullscreen){
-        HTMLVideoElement.prototype.webkitEnterFullscreen = function(){return origReqFs.call(vw)};
-    }
+    HTMLVideoElement.prototype.requestFullscreen=function(){return origReqFs.call(vw)};
+    if(HTMLVideoElement.prototype.webkitRequestFullscreen)
+        HTMLVideoElement.prototype.webkitRequestFullscreen=function(){return origReqFs.call(vw)};
 }
+
+// Позиционируем RUBOT точно на видео (учитывая object-fit:contain)
+function posRubot(){
+    if(!v.videoWidth||!v.videoHeight){rubot.style.top='5px';rubot.style.right='5px';return}
+    var cw=v.clientWidth,ch=v.clientHeight;
+    var vw2=v.videoWidth,vh=v.videoHeight;
+    var scale=Math.min(cw/vw2,ch/vh);
+    var rh=vh*scale,rw=vw2*scale;
+    var offY=(ch-rh)/2;
+    var offX=(cw-rw)/2;
+    rubot.style.top=Math.max(0,Math.round(offY+4))+'px';
+    rubot.style.right=Math.max(0,Math.round(offX+4))+'px';
+}
+v.addEventListener('loadeddata',posRubot);
+v.addEventListener('playing',posRubot);
+window.addEventListener('resize',posRubot);
+setInterval(posRubot,1000);
+// Также при fullscreen change
+document.addEventListener('fullscreenchange',function(){setTimeout(posRubot,300)});
+document.addEventListener('webkitfullscreenchange',function(){setTimeout(posRubot,300)});
 
 function err(m){
     ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Смотреть на сайте ↗</a>':'')+'</div>';
