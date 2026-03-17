@@ -8,47 +8,28 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        html,body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;height:100%;overflow:hidden}
-        
-        .hdr{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.1);height:36px;flex-shrink:0}
+        body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+        .hdr{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.1);min-height:36px;flex-shrink:0}
         .logo{font-size:16px;font-weight:800;background:linear-gradient(135deg,#ff4444,#ff8800);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
         .mi{font-size:11px;color:rgba(255,255,255,.7);text-align:right;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .lb{display:inline-flex;align-items:center;gap:3px;background:#e53935;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700}
         .lb::before{content:'';width:5px;height:5px;background:#fff;border-radius:50%;animation:pulse 1.5s infinite}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-        
-        /* Видео на весь экран под хедером */
-        .wrap{position:relative;width:100%;height:calc(100% - 36px);background:#000}
-        video{width:100%;height:100%;background:#000}
-        
-        /* RUBOT — правый верхний угол, ВНУТРИ видео-зоны */
+        .pc{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+        .video-wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+        video{width:100%;height:100%;object-fit:contain;background:#000}
         .rubot{
             position:absolute;
-            top:5px;right:5px;
-            z-index:999999;
-            pointer-events:none;
-            user-select:none;
+            z-index:9999;
+            pointer-events:none;user-select:none;
             display:flex;align-items:center;gap:4px;
             background:linear-gradient(135deg,rgba(255,68,68,.92),rgba(255,120,0,.92));
             padding:3px 8px;border-radius:5px;
             box-shadow:0 2px 8px rgba(0,0,0,.6);
+            top:5px;right:5px;
         }
         .rubot b{font-size:11px;font-weight:800;color:#fff;letter-spacing:1px}
         .rubot i{width:14px;height:14px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#ff4444;font-style:normal}
-        
-        /* Фейковый fullscreen — на весь экран */
-        .wrap.fs{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:9999999!important}
-        .wrap.fs .rubot{display:flex!important;z-index:99999999!important}
-        .wrap.fs~.hdr{display:none}
-        
-        /* Кнопка fullscreen */
-        .fs-btn{
-            position:absolute;bottom:12px;right:12px;z-index:999998;
-            width:36px;height:36px;background:rgba(0,0,0,.6);border:none;border-radius:6px;
-            cursor:pointer;display:flex;align-items:center;justify-content:center;
-        }
-        .fs-btn svg{width:20px;height:20px;fill:#fff}
-        
         .ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5}
         .sp{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:#ff4444;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 10px}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -57,39 +38,33 @@
     </style>
 </head>
 <body>
-<div class="hdr" id="hdr">
+<div class="hdr">
     <div class="logo">LIVEBALL</div>
     <div class="mi"><span class="lb">LIVE</span> <span id="t"></span></div>
 </div>
-<div class="wrap" id="wrap">
-    <video id="v" autoplay playsinline></video>
-    <div class="rubot"><i>R</i><b>RUBOT</b></div>
-    
-    <!-- Своя кнопка fullscreen -->
-    <button class="fs-btn" id="fsbtn" title="Полный экран">
-        <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-    </button>
-    
+<div class="pc">
+    <div class="video-wrap">
+        <video id="v" controls autoplay playsinline></video>
+        <div class="rubot" id="rubot"><i>R</i><b>RUBOT</b></div>
+    </div>
     <div class="ld" id="ld">
         <div class="sp"></div>
         <div style="color:rgba(255,255,255,.5);font-size:12px">Загрузка...</div>
     </div>
 </div>
 <script>
-const tg=window.Telegram?.WebApp;
+var tg=window.Telegram&&window.Telegram.WebApp;
 if(tg){tg.ready();tg.expand();tg.setHeaderColor('#000');tg.setBackgroundColor('#000')}
 
-const P=new URLSearchParams(location.search);
-const S=P.get('stream');
-const F=P.get('fallback')||'';
-const T=P.get('teams')||'';
+var P=new URLSearchParams(location.search);
+var S=P.get('stream');
+var F=P.get('fallback')||'';
+var T=P.get('teams')||'';
 document.getElementById('t').textContent=T?' '+T:'';
 
-const v=document.getElementById('v');
-const ld=document.getElementById('ld');
-const wrap=document.getElementById('wrap');
-const hdr=document.getElementById('hdr');
-const fsbtn=document.getElementById('fsbtn');
+var v=document.getElementById('v');
+var ld=document.getElementById('ld');
+var rb=document.getElementById('rubot');
 
 // Блокируем переходы
 window.open=function(){return null};
@@ -103,57 +78,45 @@ document.addEventListener('click',function(e){
     }
 },true);
 
-// Фейковый fullscreen — wrap на весь экран, RUBOT виден всегда
-var isFs=false;
-function toggleFs(){
-    isFs=!isFs;
-    if(isFs){
-        wrap.classList.add('fs');
-        hdr.style.display='none';
-        // Попробуем повернуть экран на мобиле
-        try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
-    }else{
-        wrap.classList.remove('fs');
-        hdr.style.display='';
-        try{screen.orientation.unlock()}catch(e){}
-    }
+// Позиционируем RUBOT на видео (учитывая object-fit:contain)
+function posRubot(){
+    var vw=v.videoWidth,vh=v.videoHeight;
+    if(!vw||!vh){rb.style.top='5px';rb.style.right='5px';return}
+    var cw=v.clientWidth,ch=v.clientHeight;
+    var scale=Math.min(cw/vw,ch/vh);
+    var realH=vh*scale,realW=vw*scale;
+    var offY=(ch-realH)/2;
+    var offX=(cw-realW)/2;
+    rb.style.top=Math.round(offY+4)+'px';
+    rb.style.right=Math.round(offX+4)+'px';
 }
-fsbtn.addEventListener('click',function(e){e.stopPropagation();toggleFs()});
-
-// Двойной тап — тоже fullscreen
-var lastTap=0;
-wrap.addEventListener('touchend',function(e){
-    var now=Date.now();
-    if(now-lastTap<300){toggleFs();e.preventDefault()}
-    lastTap=now;
-});
-// Двойной клик на десктопе
-v.addEventListener('dblclick',function(e){e.preventDefault();toggleFs()});
-
-// ESC выходит из fullscreen
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&isFs)toggleFs()});
+v.addEventListener('loadeddata',posRubot);
+v.addEventListener('playing',posRubot);
+v.addEventListener('resize',posRubot);
+window.addEventListener('resize',posRubot);
+setInterval(posRubot,500);
 
 function err(m){
     ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Смотреть на сайте ↗</a>':'')+'</div>';
 }
 
 if(S){
-    const proxies=[S,'https://corsproxy.io/?'+encodeURIComponent(S),'https://api.allorigins.win/raw?url='+encodeURIComponent(S)];
-    let pi=0;
+    var proxies=[S,'https://corsproxy.io/?'+encodeURIComponent(S),'https://api.allorigins.win/raw?url='+encodeURIComponent(S)];
+    var pi=0;
     function tryLoad(url){
         if(Hls.isSupported()){
-            const h=new Hls({maxBufferLength:30,maxMaxBufferLength:60,xhrSetup:function(x){x.withCredentials=false}});
+            var h=new Hls({maxBufferLength:30,maxMaxBufferLength:60,xhrSetup:function(x){x.withCredentials=false}});
             h.loadSource(url);h.attachMedia(v);
-            h.on(Hls.Events.MANIFEST_PARSED,()=>{ld.style.display='none';v.play().catch(()=>{})});
-            h.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal){h.destroy();pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Не удалось загрузить')}});
+            h.on(Hls.Events.MANIFEST_PARSED,function(){ld.style.display='none';v.play().catch(function(){})});
+            h.on(Hls.Events.ERROR,function(e,d){if(d.fatal){h.destroy();pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Не удалось загрузить')}});
         }else if(v.canPlayType('application/vnd.apple.mpegurl')){
             v.src=url;
-            v.addEventListener('loadedmetadata',()=>{ld.style.display='none';v.play()});
-            v.addEventListener('error',()=>{pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Ошибка')});
+            v.addEventListener('loadedmetadata',function(){ld.style.display='none';v.play()});
+            v.addEventListener('error',function(){pi++;if(pi<proxies.length)tryLoad(proxies[pi]);else err('Ошибка')});
         }else err('HLS не поддерживается');
     }
     tryLoad(proxies[0]);
-    setTimeout(()=>{if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
+    setTimeout(function(){if(ld.style.display!=='none')err('Долгая загрузка...')},30000);
 }else err('Трансляция недоступна');
 </script>
 </body>
