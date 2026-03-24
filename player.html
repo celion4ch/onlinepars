@@ -62,8 +62,7 @@ window.open=function(){return null};
 function err(m){ld.innerHTML='<div class="er"><p>'+m+'</p>'+(F?'<a href="'+F+'" target="_blank">Смотреть на сайте ↗</a>':'')+'</div>'}
 
 if(S){
-var proxyBase=location.origin+'/stream?url=';
-var streamUrl=proxyBase+encodeURIComponent(S);
+var streamUrl=S;
 if(Hls.isSupported()){
 var h=new Hls({maxBufferLength:30,maxMaxBufferLength:60});
 h.loadSource(streamUrl);h.attachMedia(v);
