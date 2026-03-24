@@ -96,7 +96,7 @@ def main():
     app.router.add_route("OPTIONS", "/{path:.*}", handle_cors)
 
     logger.info(f"🎬 Stream proxy on port {PORT}")
-    web.run_app(app, port=PORT, print=None)
+    web.run_app(app, host="0.0.0.0", port=PORT, print=None)
 
 
 if __name__ == "__main__":
